@@ -33,6 +33,12 @@ export const BET_GRID: BetOption[] = [
   { value: 2, weight: 100 }    // 10.0%  保本位
 ];
 
+export const AVATAR_LIST: string[] = [
+  'avatar_default',
+  'avatar_1', 'avatar_2', 'avatar_3', 'avatar_4',
+  'avatar_5', 'avatar_6', 'avatar_7', 'avatar_8'
+];
+
 // 里程碑配置
 export const MILESTONES: Milestone[] = [
   { id: 1, threshold: 100, title: '初出茅庐', description: '累计获得100游戏币', unlocked: false },

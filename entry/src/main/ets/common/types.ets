@@ -8,6 +8,7 @@ export interface UserProfile {
   lastDailyDate: number;
   quote?: string;     // 个性签名
   gameName?: string;  // 游戏绑定名
+  avatarId?: string;  // 【新增】头像ID字符串
 }
 
 export interface BetOption {

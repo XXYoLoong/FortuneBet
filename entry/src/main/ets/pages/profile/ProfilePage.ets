@@ -2,6 +2,7 @@ import { common, Want } from '@kit.AbilityKit';
 import type { GameRound, UserProfile } from '../../common/types';
 import { useAuthService, useHistoryService } from '../../services/ServiceLocator';
 import { ensureStorage, StorageService } from '../../services/StorageService';
+import { AVATAR_LIST } from '../../common/constants';
 
 // 定义页面枚举，用于简单的页面路由
 enum ProfileView {
@@ -30,6 +31,7 @@ export struct ProfilePage {
   // 编辑资料表单
   @State editNickname: string = '';
   @State editQuote: string = '';
+  @State editAvatarId: string = 'avatar_default'; // 【新增】编辑时的头像ID
 
   // 修改密码表单
   @State oldPassword: string = '';
@@ -60,6 +62,8 @@ export struct ProfilePage {
       this.profile = user;
       this.editNickname = user.nickname ?? '';
       this.editQuote = user.quote ?? '';
+      // 【新增】初始化编辑头像ID，如果没有则用默认
+      this.editAvatarId = user.avatarId ?? 'avatar_default';
     }
   }
 
@@ -74,6 +78,8 @@ export struct ProfilePage {
     if (!this.profile || !this.storage) return;
     this.profile.nickname = this.editNickname.trim() || undefined;
     this.profile.quote = this.editQuote.trim() || undefined;
+    // 【新增】保存选择的头像ID
+    this.profile.avatarId = this.editAvatarId;
     await this.storage.saveUser(this.profile);
     // 返回设置页
     this.currentView = ProfileView.SETTINGS;
@@ -128,6 +134,22 @@ export struct ProfilePage {
       this.aboutAnimTranslateY = 0;
       this.aboutAnimTranslateX = 0;
     });
+  }
+
+  // 【新增】辅助函数：根据ID获取图片资源
+  private getAvatarResource(avatarId?: string): Resource {
+    const id = avatarId ?? 'avatar_default';
+    switch (id) {
+      case 'avatar_1': return $r('app.media.avatar_1');
+      case 'avatar_2': return $r('app.media.avatar_2');
+      case 'avatar_3': return $r('app.media.avatar_3');
+      case 'avatar_4': return $r('app.media.avatar_4');
+      case 'avatar_5': return $r('app.media.avatar_5');
+      case 'avatar_6': return $r('app.media.avatar_6');
+      case 'avatar_7': return $r('app.media.avatar_7');
+      case 'avatar_8': return $r('app.media.avatar_8');
+      default: return $r('app.media.avatar_default');
+    }
   }
 
   // ---------------- UI 构建 ----------------
@@ -194,10 +216,13 @@ export struct ProfilePage {
   private renderUserInfo() {
     Column() {
       Row() {
-        // 头像
-        Circle({ width: 60, height: 60 })
-          .fill('#2a3150')
-          .margin({ right: 16 });
+        // 【修改】使用 Image 展示头像，替代原来的 Circle
+        Image(this.getAvatarResource(this.profile?.avatarId))
+          .width(64)
+          .height(64)
+          .borderRadius(32) // 圆形头像
+          .margin({ right: 16 })
+          .border({ width: 2, color: '#1a1f3a' }); // 加个边框更有质感
 
         Column() {
           Text(this.profile!.nickname || `玩家 ${this.profile!.account}`)
@@ -327,7 +352,41 @@ export struct ProfilePage {
   private renderEditProfilePage() {
     Column() {
       this.renderBackHeader('修改资料', () => this.currentView = ProfileView.SETTINGS);
+      Scroll(){
       Column({ space: 20 }) {
+        Column() {
+          Text('选择头像').fontSize(14).fontColor('#a0a0a0').margin({ bottom: 12 }).width('100%');
+          Grid() {
+            ForEach(AVATAR_LIST, (id: string) => {
+              GridItem() {
+                Stack({ alignContent: Alignment.BottomEnd }) {
+                  Image(this.getAvatarResource(id))
+                    .width(60)
+                    .height(60)
+                    .borderRadius(30)
+                    // 选中高亮边框
+                    .border({ width: this.editAvatarId === id ? 3 : 0, color: '#4ecdc4' })
+                    .onClick(() => this.editAvatarId = id);
+
+                  // 选中时显示一个小对勾图标
+                  if (this.editAvatarId === id) {
+                    Image($r('app.media.startIcon')) // 这里用 app_icon 代替对勾，你可以换成专门的 icon
+                      .width(16).height(16)
+                      .borderRadius(8).backgroundColor('#4ecdc4').padding(2)
+                      .fillColor('#ffffff')
+                      .margin({ bottom: 2, right: 2 })
+                  }
+                }
+              }
+            }, (id: string) => id)
+          }
+          .columnsTemplate('1fr 1fr 1fr 1fr') // 4列布局
+          .rowsGap(12)
+          .columnsGap(12)
+          .width('100%')
+          .height(140); // 固定 Grid 高度
+        }
+
         TextInput({ placeholder: '昵称', text: this.editNickname })
           .height(48).backgroundColor('#1a1f3a').fontColor('#ffffff').borderRadius(8)
           .onChange(v => this.editNickname = v);
@@ -340,9 +399,9 @@ export struct ProfilePage {
           .width('100%').height(48).backgroundColor('#e04542')
           .onClick(() => this.saveProfile());
       }.padding(20);
-    }
+    }.layoutWeight(1).width('100%');
   }
-
+}
   // --- 4. 修改密码页面 ---
   @Builder
   private renderChangePasswordPage() {

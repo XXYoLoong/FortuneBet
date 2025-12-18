@@ -59,11 +59,13 @@ export class AuthService {
       balance: DAILY_COINS,
       totalCoins: 0,
       lastLogin: Date.now(),
-      lastDailyDate: Date.now()
+      lastDailyDate: Date.now(),
+      avatarId: 'avatar_default' // 【新增】设置默认头像
     };
 
     await this.storage.saveUser(newUser);
     await this.storage.setLoginAccount(account);
+
     return { ok: true, profile: newUser };
   }
 
@@ -102,7 +104,8 @@ export class AuthService {
         balance: 9999,
         totalCoins: 0,
         lastLogin: Date.now(),
-        lastDailyDate: Date.now()
+        lastDailyDate: Date.now(),
+        avatarId: 'avatar_default' // 【新增】内测账号默认头像
       };
       await this.storage.saveUser(user);
     } else {
