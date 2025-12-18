@@ -36,10 +36,11 @@ export class AuthService {
       return { ok: false, message: '密码错误' };
     }
 
+    // 登录成功不需要在这里 setLoginAccount，
+    // 因为我们现在依赖 Index.ets 的 AppStorage 状态来控制
+    // 不过为了兼容性，保留 storage 的状态更新是好的
     await this.storage.setLoginAccount(account);
-
     const updatedUser = await this.storage.ensureDailyCoins(account);
-
     return { ok: true, profile: updatedUser ?? user };
   }
 
@@ -63,23 +64,36 @@ export class AuthService {
 
     await this.storage.saveUser(newUser);
     await this.storage.setLoginAccount(account);
-
     return { ok: true, profile: newUser };
+  }
+
+  // 【新增】修改密码
+  async updatePassword(account: string, oldPass: string, newPass: string): Promise<AuthResult> {
+    if (!this.storage) return { ok: false, message: '系统未初始化' };
+    const user = await this.storage.getUser(account);
+    if (!user) return { ok: false, message: '用户不存在' };
+
+    // 验证旧密码
+    if (user.password !== this.simpleHash(oldPass)) {
+      return { ok: false, message: '旧密码错误' };
+    }
+
+    // 更新新密码
+    user.password = this.simpleHash(newPass);
+    await this.storage.saveUser(user);
+    return { ok: true, message: '密码修改成功' };
   }
 
   async currentUser(): Promise<UserProfile | undefined> {
     if (!this.storage) return undefined;
     const account = await this.storage.getLoginAccount();
     if (!account) return undefined;
-
     return (await this.storage.ensureDailyCoins(account)) ?? undefined;
   }
 
   private async handleTestAccountLogin(): Promise<AuthResult> {
     if (!this.storage) return { ok: false };
-
     let user = await this.storage.getUser('1');
-
     if (!user) {
       user = {
         account: '1',
@@ -92,14 +106,12 @@ export class AuthService {
       };
       await this.storage.saveUser(user);
     } else {
-      // 修复：user.balance 可能是 undefined
       const currentBalance = user.balance ?? 0;
       if (currentBalance < 10) {
         user.balance = 5000;
         await this.storage.saveUser(user);
       }
     }
-
     await this.storage.setLoginAccount('1');
     return { ok: true, profile: user };
   }

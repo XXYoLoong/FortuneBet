@@ -10,7 +10,11 @@ import { ProfilePage } from './profile/ProfilePage';
 struct Index {
   @State currentTab: string = 'game';
   @State initialized: boolean = false;
-  @State account: string = '';
+
+  // 【核心修改】使用 StorageLink 建立全局双向绑定
+  // 当任何地方修改 'currentAccount' 时，这里会自动更新
+  @StorageLink('currentAccount') account: string = '';
+
   @State loginAccount: string = '';
   @State loginPassword: string = '';
   @State loginError: string = '';
@@ -20,23 +24,18 @@ struct Index {
   async aboutToAppear(): Promise<void> {
     try {
       await initServices(getContext(this));
-      const auth = useAuthService();
-      // Only check for existing session, do not auto-create
-      const profile = await auth.currentUser();
-      if (profile) {
-        this.account = profile.account;
-      }
-    } catch (e) {
-      const error = e instanceof Error ? e : new Error(String(e));
-      console.error('Initialization failed:', error.message);
-    } finally {
+      // 【核心修改】初始化服务后，不再自动读取 currentUser 赋值给 account
+      // 从而强制用户必须在界面上手动点击登录
       this.initialized = true;
+    } catch (e) {
+      console.error('Initialization failed:', e);
     }
   }
 
   private async handleLogin(): Promise<void> {
     if (this.isLoading) return;
 
+    // 内测账号快捷通道
     const isInternalTest = this.loginAccount === '1' && this.loginPassword === '1';
 
     if (!this.loginAccount.trim()) {
@@ -53,19 +52,14 @@ struct Index {
 
     try {
       const auth = useAuthService();
-
-      // CHANGE: Use the explicit interface instead of 'any'
       let res: AuthResult;
 
       if (isInternalTest) {
-        // Try login first
         res = await auth.login(this.loginAccount, this.loginPassword);
-        // If login fails, auto-register
         if (!res.ok) {
           res = await auth.register(this.loginAccount, this.loginPassword);
         }
       } else {
-        // Standard user flow
         res = this.isRegisterMode
           ? await auth.register(this.loginAccount.trim(), this.loginPassword.trim())
           : await auth.login(this.loginAccount.trim(), this.loginPassword.trim());
@@ -77,8 +71,8 @@ struct Index {
         return;
       }
 
-      // Since we checked res.ok, we assume profile exists, but safe navigation is good
       if (res.profile) {
+        // 【核心修改】登录成功后，更新全局状态，UI 会自动切换到 Tab 页
         this.account = res.profile.account;
       }
 
@@ -94,21 +88,19 @@ struct Index {
     }
   }
 
-  private async handleForgetPassword(): Promise<void> {
-    this.loginError = '本地应用，请记住您的密码';
-  }
-
   build() {
     Column() {
       if (!this.initialized) {
         Column() {
-          Text('加载中...').fontSize(16).fontColor('#666666');
+          Text('资源加载中...').fontSize(16).fontColor('#666666');
         }
         .width('100%').height('100%')
-        .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center);
+        .justifyContent(FlexAlign.Center);
       } else if (!this.account) {
+        // 没有账号时，强制显示登录页
         this.renderLogin();
       } else {
+        // 有账号时，显示主界面
         this.renderTabs();
       }
     }.width('100%').height('100%')
@@ -124,33 +116,23 @@ struct Index {
         .margin({ bottom: 50 });
 
       Column() {
-        // Account Input
         Column() {
           Text('账号').fontSize(14).fontColor('#333333').alignSelf(ItemAlign.Start).margin({ bottom: 8 });
-          TextInput({
-            placeholder: '请输入账号',
-            text: this.loginAccount
-          })
+          TextInput({ placeholder: '请输入账号', text: this.loginAccount })
             .width('100%').height(48)
             .backgroundColor('#f8f8f8').borderRadius(8)
             .padding({ left: 12, right: 12 })
-            .border({ width: 1, color: this.loginAccount ? '#e04542' : '#e0e0e0' })
             .onChange(v => { this.loginAccount = v; this.loginError = ''; })
             .enabled(!this.isLoading);
         }.width('100%').margin({ bottom: 20 });
 
-        // Password Input
         Column() {
           Text('密码').fontSize(14).fontColor('#333333').alignSelf(ItemAlign.Start).margin({ bottom: 8 });
-          TextInput({
-            placeholder: '请输入密码',
-            text: this.loginPassword
-          })
+          TextInput({ placeholder: '请输入密码', text: this.loginPassword })
             .type(InputType.Password)
             .width('100%').height(48)
             .backgroundColor('#f8f8f8').borderRadius(8)
             .padding({ left: 12, right: 12 })
-            .border({ width: 1, color: this.loginPassword ? '#e04542' : '#e0e0e0' })
             .showPasswordIcon(true)
             .onChange(v => { this.loginPassword = v; this.loginError = ''; })
             .enabled(!this.isLoading);
@@ -162,18 +144,16 @@ struct Index {
             .textAlign(TextAlign.Start).margin({ bottom: 12 });
         }
 
-        Button(this.isLoading ? (this.isRegisterMode ? '注册中...' : '登录中...') : (this.isRegisterMode ? '注册' : '登录'), {
+        Button(this.isLoading ? (this.isRegisterMode ? '处理中...' : '登录中...') : (this.isRegisterMode ? '注册' : '登录'), {
           type: ButtonType.Capsule, stateEffect: true
         })
           .width('100%').height(50)
           .fontSize(16).fontWeight(FontWeight.Medium)
-        // Allow simplified validation for "1"
           .enabled(!this.isLoading && this.loginAccount.length > 0 && this.loginPassword.length > 0)
           .onClick(async () => await this.handleLogin());
 
         Row() {
-          Text('忘记密码').fontSize(14).fontColor('#5083ff')
-            .onClick(async () => await this.handleForgetPassword());
+          Text('忘记密码').fontSize(14).fontColor('#5083ff'); // 简单提示
           Blank();
           Text(this.isRegisterMode ? '已有账号？去登录' : '没有账号？去注册')
             .fontSize(14).fontColor('#5083ff')
@@ -182,8 +162,6 @@ struct Index {
               this.loginError = '';
             });
         }.width('100%').margin({ top: 20 });
-
-        // REMOVED: The visual hint for test account
       }
       .width('85%').padding(24)
       .backgroundColor('#ffffff').borderRadius(16)
